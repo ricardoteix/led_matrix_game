@@ -72,6 +72,8 @@ unsigned long tempoTiro = millis();
 unsigned long tempoAtualizarTiro = millis();
 unsigned long tempoNascerInimigo = millis();
 unsigned long tempoMoverInimigo = millis();
+int tempoMoverInimigoEspera = 200;
+int tempoNascerInimigoEspera = 2000;
 
 // Definição da estrutura para representar um objeto com x, y e display
 struct Tiro {
@@ -87,6 +89,10 @@ struct Inimigo {
   byte bits[2] = { B10, B01 };  
 };
 
+byte barraProgresso = B00000000;
+byte contagemAcertos = 0;
+
+int quantidadeInimigosLevel = 5;
 
 // Lista para armazenar os objetos LEDPosition
 Tiro tiros[8]; // Tamanho da lista é 10 como exemplo
@@ -145,20 +151,62 @@ void atualizarTiros() {
   }
 }
 
-void verificarColisao() {
-  return;
+void verificarProgresso() {
+  
+  if (contagemAcertos == quantidadeInimigosLevel) {
+    barraProgresso = B00000001;  
+    tempoNascerInimigoEspera -= 200;   
+    tempoMoverInimigoEspera -= 20;     
+  }
+  
+  if (contagemAcertos > quantidadeInimigosLevel) {
+    barraProgresso |= B00000001 << (int)(contagemAcertos / quantidadeInimigosLevel); 
+    tempoNascerInimigoEspera -= 200;  
+    tempoMoverInimigoEspera -= 20;      
+  }
+  
+  contagemAcertos++;
+    
+}
+
+void verificarAcerto() {
+  
   for (int i = 0; i < 8; i++) {
     for (int j = 0; j < 3; j++) {
 
-        if (tiros[i].display == 255 || inimigos[j].display == 255) {
+        byte displayTiro = tiros[i].display;
+        byte displayInimigo = inimigos[j].display;
+
+        if (displayTiro == 255 || displayInimigo == 255) {
           continue;
         }
 
         if (
-          (tiros[i].x == inimigos[j].x) || (tiros[i].x == inimigos[j].x + 1) &&
-          (tiros[i].y == inimigos[j].y) || (tiros[i].y == inimigos[j].y - 1) &&
-          (tiros[i].display == inimigos[j].display)) {
-            
+          ((tiros[i].x == inimigos[j].x) || (tiros[i].x == inimigos[j].x - 1)) &&
+          ((tiros[i].y == inimigos[j].y - 1) || (tiros[i].y == inimigos[j].y - 2)) &&
+          (displayTiro == displayInimigo)) {
+          
+          // Limpa
+          setBitValue(tiros[i].display, tiros[i].x, tiros[i].y - 1, false);
+          setBitValue(tiros[i].display, tiros[i].x, tiros[i].y - 2, false);
+          setBitValue(tiros[i].display, tiros[i].x, tiros[i].y, false);
+          setBitValue(tiros[i].display, tiros[i].x, tiros[i].y + 1, false);
+
+          if (tiros[i].x < inimigos[j].x) {
+            setBitValue(tiros[i].display, tiros[i].x + 1, tiros[i].y - 1, false);
+            setBitValue(tiros[i].display, tiros[i].x + 1, tiros[i].y - 2, false);
+            setBitValue(tiros[i].display, tiros[i].x + 1, tiros[i].y, false);
+            setBitValue(tiros[i].display, tiros[i].x + 1, tiros[i].y + 1, false);
+          } 
+
+          if (tiros[i].x == inimigos[j].x) {
+            setBitValue(tiros[i].display, tiros[i].x - 1, tiros[i].y - 1, false);
+            setBitValue(tiros[i].display, tiros[i].x - 1, tiros[i].y - 2, false);
+            setBitValue(tiros[i].display, tiros[i].x - 1, tiros[i].y, false);
+            setBitValue(tiros[i].display, tiros[i].x - 1, tiros[i].y + 1, false);
+          } 
+          // Fim Limpa  
+
           tiros[i].display = 255;
           tiros[i].x = 255;
           tiros[i].y = 255;
@@ -171,6 +219,8 @@ void verificarColisao() {
           digitalWrite(BUZZER, 1);
           delay(150);
           digitalWrite(BUZZER, 0);
+          
+          verificarProgresso();
 
           // setBitValue(0, tiros[i].x, 0, false);
           // continue;
@@ -187,7 +237,7 @@ void adicionarInimigo(bool semEspera = false, bool atualizarPosicao = true) {
     return;
   }
 
-  if (millis() - tempoNascerInimigo > 2000 || semEspera) {
+  if (millis() - tempoNascerInimigo > tempoNascerInimigoEspera || semEspera) {
     tempoNascerInimigo = millis();
     inimigos[ultimoInimigo].display = 0;
     inimigos[ultimoInimigo].x = posicao;
@@ -200,7 +250,7 @@ void adicionarInimigo(bool semEspera = false, bool atualizarPosicao = true) {
 }
 
 void atualizarInimigos() {
-  if (millis() - tempoMoverInimigo > 200) {
+  if (millis() - tempoMoverInimigo > tempoMoverInimigoEspera) {
     tempoMoverInimigo = millis();
 
     for (int i = 0; i < 3; i++) {
@@ -266,6 +316,12 @@ void setBitValue(int display, int row, int column, bool value) {
 }
 
 void exibirMatrizes() {
+
+  for (int c = 0; c < 8; c++) {
+    // displayBits[3][c] = bitRead(barraProgresso, c);
+    setBitValue(0, c, 0, bitRead(barraProgresso, c));
+  }
+
   for (byte d = 0; d < NUM_DISPLAYS; d++) {
     for (byte i = 0; i < 8; i++) {
       lc.setRow(d, i, displayBits[d][i]); 
@@ -368,12 +424,15 @@ void loop() {
     adicionarInimigo(true);
   }
 
-  adicionarInimigo();
-  atualizarInimigos();
-  atualizarTiros();
-  verificarColisao();
-  exibirNave();
-  exibirMatrizes();
+  if (digitalRead(KEY_C) == 0 || true) { 
+    exibirMatrizes();
+    adicionarInimigo();
+    atualizarInimigos();
+    atualizarTiros();
+    verificarAcerto();
+    exibirNave();
+    while(digitalRead(KEY_C) == 0);
+  }
 }
 
 
