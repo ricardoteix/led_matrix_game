@@ -12,3 +12,5 @@ Neste exemplo usamos a biblioteca [LedControl](https://wayoda.github.io/LedContr
 para simplificar ainda mais o código.
 
 A [shield JoyStick](https://s.click.aliexpress.com/e/_DmHztbD) contém um joystick analógico e 4 botões. Vamos usar esses controles para movimentar os elementos no display.
+
+![](assets/Dual-Axis-Joystick-Shield-Pinout.jpg)

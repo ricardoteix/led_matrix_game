@@ -6,12 +6,17 @@
 
 #define X_AXIS A0
 #define Y_AXIS A1
-#define KEY 8
+#define KEY_A 2
+#define KEY_B 3
+#define KEY_C 4
+#define KEY_D 5
+#define BUZZER 7
+
 
 // Definição dos pinos para conexão com o MAX7219
-#define DATA_IN_PIN   2  // Pino de dados (DIN)
-#define CLK_PIN       3  // Pino do clock (CLK)
-#define LOAD_PIN      4  // Pino de carga (CS)
+#define DATA_IN_PIN   9  // Pino de dados (DIN)
+#define CLK_PIN       10  // Pino do clock (CLK)
+#define LOAD_PIN      11  // Pino de carga (CS)
 
 // Número de matrizes de LED no display
 #define NUM_DISPLAYS  4  
@@ -65,6 +70,8 @@ int linhaNave = 0;
 unsigned long tempoNave = millis();
 unsigned long tempoTiro = millis();
 unsigned long tempoAtualizarTiro = millis();
+unsigned long tempoNascerInimigo = millis();
+unsigned long tempoMoverInimigo = millis();
 
 // Definição da estrutura para representar um objeto com x, y e display
 struct Tiro {
@@ -73,12 +80,21 @@ struct Tiro {
   byte y = 255;
 };
 
+struct Inimigo {
+  byte display = 255;
+  byte x = 255;
+  byte y = 255;
+  byte bits[2] = { B10, B01 };  
+};
+
+
 // Lista para armazenar os objetos LEDPosition
 Tiro tiros[8]; // Tamanho da lista é 10 como exemplo
+Inimigo inimigos[3];
+byte ultimoInimigo = 0;
 
 // Função para adicionar um objeto à lista de tiros
-void adicionarTiro(byte display, byte x, byte y) {
-  
+void adicionarTiro(byte display, byte x, byte y) {  
   // Só adiciona se não tem na linha
   if (tiros[display].display == 255 && tiros[x].x != x) {
     tiros[x].x = x;
@@ -129,6 +145,119 @@ void atualizarTiros() {
   }
 }
 
+void verificarColisao() {
+  return;
+  for (int i = 0; i < 8; i++) {
+    for (int j = 0; j < 3; j++) {
+
+        if (tiros[i].display == 255 || inimigos[j].display == 255) {
+          continue;
+        }
+
+        if (
+          (tiros[i].x == inimigos[j].x) || (tiros[i].x == inimigos[j].x + 1) &&
+          (tiros[i].y == inimigos[j].y) || (tiros[i].y == inimigos[j].y - 1) &&
+          (tiros[i].display == inimigos[j].display)) {
+            
+          tiros[i].display = 255;
+          tiros[i].x = 255;
+          tiros[i].y = 255;
+          inimigos[j].display = 255;
+          inimigos[j].x = 255;
+          inimigos[j].y = 255;
+
+          setBitValue(tiros[i].display, tiros[i].x, tiros[i].y, false);
+          
+          digitalWrite(BUZZER, 1);
+          delay(150);
+          digitalWrite(BUZZER, 0);
+
+          // setBitValue(0, tiros[i].x, 0, false);
+          // continue;
+        }
+    }
+  }
+}
+
+void adicionarInimigo(bool semEspera = false, bool atualizarPosicao = true) {
+
+  byte posicao = (byte)random(1, 7);
+
+  if (inimigos[ultimoInimigo].display != 255) {
+    return;
+  }
+
+  if (millis() - tempoNascerInimigo > 2000 || semEspera) {
+    tempoNascerInimigo = millis();
+    inimigos[ultimoInimigo].display = 0;
+    inimigos[ultimoInimigo].x = posicao;
+    inimigos[ultimoInimigo].y = ultimoInimigo;
+    
+    if (atualizarPosicao) {
+      ultimoInimigo = ++ultimoInimigo % 3;
+    } 
+  }
+}
+
+void atualizarInimigos() {
+  if (millis() - tempoMoverInimigo > 200) {
+    tempoMoverInimigo = millis();
+
+    for (int i = 0; i < 3; i++) {
+      
+      if (inimigos[i].display == 255) {
+        continue;
+      }
+
+      if (inimigos[i].y == 0 && inimigos[i].display > 0) {
+        setBitValue(inimigos[i].display - 1, inimigos[i].x, 6, false);
+        setBitValue(inimigos[i].display - 1, inimigos[i].x - 1, 6, false);
+      } else if (inimigos[i].y == 1 && inimigos[i].display > 0) {
+        setBitValue(inimigos[i].display - 1, inimigos[i].x, 7, false);
+        setBitValue(inimigos[i].display - 1, inimigos[i].x - 1, 7, false);
+      } else {
+        setBitValue(inimigos[i].display, inimigos[i].x, inimigos[i].y - 2, false);
+        setBitValue(inimigos[i].display, inimigos[i].x - 1, inimigos[i].y - 2, false);
+      }
+      
+      int mode = inimigos[i].y % 2 == 0;
+      setBitValue(inimigos[i].display, inimigos[i].x, inimigos[i].y, bitRead(inimigos[i].bits[mode], 0));
+      setBitValue(inimigos[i].display, inimigos[i].x - 1, inimigos[i].y, bitRead(inimigos[i].bits[mode], 1));
+      setBitValue(inimigos[i].display, inimigos[i].x, inimigos[i].y - 1, bitRead(inimigos[i].bits[!mode], 0));
+      setBitValue(inimigos[i].display, inimigos[i].x - 1, inimigos[i].y - 1, bitRead(inimigos[i].bits[!mode], 1));
+
+      if (inimigos[i].y == 7) {
+        inimigos[i].y = 0;
+        inimigos[i].display++;
+      } else {
+        inimigos[i].y++;
+      }
+
+      if (inimigos[i].display == 3 && inimigos[i].y > 6) {
+
+        setBitValue(inimigos[i].display, inimigos[i].x, inimigos[i].y, 0);
+        setBitValue(inimigos[i].display, inimigos[i].x - 1, inimigos[i].y, 0);
+        setBitValue(inimigos[i].display, inimigos[i].x, inimigos[i].y - 1, 0);
+        setBitValue(inimigos[i].display, inimigos[i].x - 1, inimigos[i].y - 1, 0);
+
+        setBitValue(inimigos[i].display, inimigos[i].x, inimigos[i].y, 0);
+        setBitValue(inimigos[i].display, inimigos[i].x - 1, inimigos[i].y, 0);
+        setBitValue(inimigos[i].display, inimigos[i].x, inimigos[i].y - 2, 0);
+        setBitValue(inimigos[i].display, inimigos[i].x - 1, inimigos[i].y - 2, 0);
+
+        inimigos[i].display = 255;
+        inimigos[i].x = 255;
+        inimigos[i].y = 255;
+        Serial.println("Colisao!");
+        // digitalWrite(BUZZER, 1);
+        // delay(150);
+        // digitalWrite(BUZZER, 0);
+      }
+
+    }
+  }
+}
+
 // Modifica o valor de 1 bit na matriz geral
 void setBitValue(int display, int row, int column, bool value) {
   int result = displayBits[display][row];
@@ -144,18 +273,7 @@ void exibirMatrizes() {
   }
 }
 
-// Função para acender um LED em um display específico
-void acenderLED(int linha, int coluna, bool ligado) {
-  for (int display = 0; display < NUM_DISPLAYS; display++) {
-    if (ligado) {
-      lc.setLed(display, linha, coluna, true);
-    } else {
-      lc.setLed(display, linha, coluna, false);
-    }
-  }
-}
-
-void exibirNave() {
+void exibirNave(bool limpar = false) {
   if (linhaNave < -1) {
     linhaNave = -1;
   }
@@ -164,27 +282,22 @@ void exibirNave() {
     linhaNave = 6;
   }
 
-  setBitValue(NUM_DISPLAYS - 1, linhaNave, 7, linhaNave != -1);
-  setBitValue(NUM_DISPLAYS - 1, linhaNave + 1, 7, true);
-  setBitValue(NUM_DISPLAYS - 1, linhaNave + 2, 7, true);
-  setBitValue(NUM_DISPLAYS - 1, linhaNave + 1, 6, true);
-}
+  // Não desenha na linha do display anterior
+  setBitValue(NUM_DISPLAYS - 1, linhaNave, 7, linhaNave != -1 && !limpar);
 
-void limparNave() {
-  setBitValue(NUM_DISPLAYS - 1, linhaNave, 7, false);
-  setBitValue(NUM_DISPLAYS - 1, linhaNave + 1, 7, false);
-  setBitValue(NUM_DISPLAYS - 1, linhaNave + 2, 7, false);
-  setBitValue(NUM_DISPLAYS - 1, linhaNave + 1, 6, false);
+  setBitValue(NUM_DISPLAYS - 1, linhaNave + 1, 7, !limpar);
+  setBitValue(NUM_DISPLAYS - 1, linhaNave + 2, 7, !limpar);
+  setBitValue(NUM_DISPLAYS - 1, linhaNave + 1, 6, !limpar);
 }
 
 void moverNaveCima() {
-  limparNave();
+  exibirNave(true);
   linhaNave--;
   exibirNave();
 }
 
 void moverNaveBaixo() {
-  limparNave();
+  exibirNave(true);
   linhaNave++;
   exibirNave();
 }
@@ -213,8 +326,13 @@ void atirar() {
 void setup() {
 
   Serial.begin(9600);
-  pinMode(KEY, INPUT);
+  pinMode(KEY_A, INPUT);
+  pinMode(KEY_B, INPUT);
+  pinMode(KEY_C, INPUT);
+  pinMode(KEY_D, INPUT);
+  pinMode(BUZZER, OUTPUT);
 
+  randomSeed(analogRead(5));
   // Inicialização do objeto LedControl
 
   for (byte i = 0; i < NUM_DISPLAYS; i++) {
@@ -224,7 +342,7 @@ void setup() {
   }
 
   // lc.setLed(display, linha, coluna, true);
-
+  // adicionarInimigo(true);
   exibirNave();
   exibirMatrizes();
 
@@ -242,13 +360,20 @@ void loop() {
     direita();
   }
 
-  if (digitalRead(KEY) == 0) {
+  if (digitalRead(KEY_B) == 0) {
     atirar();
   }
 
-  atualizarTiros();
-  exibirMatrizes();
+  if (digitalRead(KEY_A) == 0) {
+    adicionarInimigo(true);
+  }
 
+  adicionarInimigo();
+  atualizarInimigos();
+  atualizarTiros();
+  verificarColisao();
+  exibirNave();
+  exibirMatrizes();
 }
 
 
