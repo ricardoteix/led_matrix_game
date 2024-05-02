@@ -153,20 +153,14 @@ void atualizarTiros() {
 
 void verificarProgresso() {
   
-  if (contagemAcertos == quantidadeInimigosLevel) {
-    barraProgresso = B00000001;  
-    tempoNascerInimigoEspera -= 200;   
-    tempoMoverInimigoEspera -= 20;     
-  }
-  
-  if (contagemAcertos > quantidadeInimigosLevel) {
-    barraProgresso |= B00000001 << (int)(contagemAcertos / quantidadeInimigosLevel); 
-    tempoNascerInimigoEspera -= 200;  
-    tempoMoverInimigoEspera -= 20;      
-  }
-  
   contagemAcertos++;
-    
+  
+  if (contagemAcertos >= quantidadeInimigosLevel) {
+    barraProgresso = (1 << (contagemAcertos / quantidadeInimigosLevel)) - 1;
+    tempoNascerInimigoEspera -= 200;
+    tempoMoverInimigoEspera -= 20;
+  }
+  
 }
 
 void verificarAcerto() {
@@ -216,14 +210,11 @@ void verificarAcerto() {
 
           setBitValue(tiros[i].display, tiros[i].x, tiros[i].y, false);
           
-          digitalWrite(BUZZER, 1);
-          delay(150);
-          digitalWrite(BUZZER, 0);
-          
-          verificarProgresso();
+          tone(BUZZER, 60, 100);
 
-          // setBitValue(0, tiros[i].x, 0, false);
-          // continue;
+          // TODO Finalizar a barra de progresso
+          // verificarProgresso();
+          
         }
     }
   }
@@ -299,9 +290,8 @@ void atualizarInimigos() {
         inimigos[i].x = 255;
         inimigos[i].y = 255;
         Serial.println("Colisao!");
-        // digitalWrite(BUZZER, 1);
-        // delay(150);
-        // digitalWrite(BUZZER, 0);
+
+        tone(BUZZER, 300, 100);
       }
 
     }
