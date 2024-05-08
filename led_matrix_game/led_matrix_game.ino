@@ -23,49 +23,56 @@
 
 LedControl lc = LedControl(DATA_IN_PIN, CLK_PIN, LOAD_PIN, NUM_DISPLAYS);
 
+// Inicia com o texto PRESS C
 int displayBits[][8] = {
   {
     B00000000,
-    B00000000,
-    B00000000,
-    B00000000,
-    B00000000,
-    B00000000,
-    B00000000,
+    B00111100,
+    B00100000,
+    B00100000,
+    B00100000,
+    B00100000,
+    B00111100,
     B00000000
   },
   {
     B00000000,
-    B00000000,
-    B00000000,
-    B00000000,
-    B00000000,
-    B00000000,
-    B00000000,
+    B11011100,
+    B00010000,
+    B00010000,
+    B11011100,
+    B01000100,
+    B11011100,
     B00000000
   },
   {
     B00000000,
-    B00000000,
-    B00000000,
-    B00000000,
-    B00000000,
-    B00000000,
-    B00000000,
+    B10011101,
+    B01010001,
+    B01010001,
+    B10011101,
+    B01010000,
+    B01011101,
     B00000000
   },
   {
     B00000000,
-    B00000000,
-    B00000000,
-    B00000000,
-    B00000000,
-    B00000000,
-    B00000000,
+    B01110011,
+    B01001010,
+    B01001010,
+    B01110011,
+    B01000010,
+    B01000010,
     B00000000
   }
 };
 
+bool pause = false;
+bool start = false;
+bool fim = false;
+byte animaFimFrame = 0;
+byte animaFimDisplay = 3;
+unsigned long tempoAnimaFim = millis();
 int linhaNave = 0;
 unsigned long tempoNave = millis();
 unsigned long tempoTiro = millis();
@@ -95,8 +102,8 @@ byte contagemAcertos = 0;
 int quantidadeInimigosLevel = 5;
 
 // Lista para armazenar os objetos LEDPosition
-Tiro tiros[8]; // Tamanho da lista é 10 como exemplo
-Inimigo inimigos[3];
+Tiro tiros[8]; // Máximo de 8 tipos simultâneos, 1 por coluna
+Inimigo inimigos[3]; // Máximo de 3 inimigos simultâneos em tela
 byte ultimoInimigo = 0;
 
 // Função para adicionar um objeto à lista de tiros
@@ -155,14 +162,19 @@ void verificarProgresso() {
   
   contagemAcertos++;
   
-  if (contagemAcertos >= quantidadeInimigosLevel) {
-    barraProgresso = (1 << (contagemAcertos / quantidadeInimigosLevel)) - 1;
-    tempoNascerInimigoEspera -= 200;
-    tempoMoverInimigoEspera -= 20;
+  barraProgresso |= 1 << (contagemAcertos) - 1;
+
+  if (barraProgresso == B11111111) {
+    fim = true;
   }
+
+  // if (contagemAcertos >= quantidadeInimigosLevel) {
+  //   barraProgresso = (1 << (contagemAcertos / quantidadeInimigosLevel)) - 1;
+  //   tempoNascerInimigoEspera -= 200;
+  //   tempoMoverInimigoEspera -= 20;
+  // }
   
 }
-
 void verificarAcerto() {
   
   for (int i = 0; i < 8; i++) {
@@ -210,10 +222,10 @@ void verificarAcerto() {
 
           setBitValue(tiros[i].display, tiros[i].x, tiros[i].y, false);
           
-          tone(BUZZER, 60, 100);
+          tone(BUZZER, 1200, 100);
 
           // TODO Finalizar a barra de progresso
-          // verificarProgresso();
+          verificarProgresso();
           
         }
     }
@@ -291,7 +303,7 @@ void atualizarInimigos() {
         inimigos[i].y = 255;
         Serial.println("Colisao!");
 
-        tone(BUZZER, 300, 100);
+        tone(BUZZER, 500, 200);
       }
 
     }
@@ -305,15 +317,19 @@ void setBitValue(int display, int row, int column, bool value) {
   displayBits[display][row] = result;
 }
 
-void exibirMatrizes() {
+void exibirMatrizes(bool limpar = false) {
 
+  // Exibe a linha da barra de progresso
   for (int c = 0; c < 8; c++) {
-    // displayBits[3][c] = bitRead(barraProgresso, c);
     setBitValue(0, c, 0, bitRead(barraProgresso, c));
   }
 
+  // Desenha toda a matriz
   for (byte d = 0; d < NUM_DISPLAYS; d++) {
     for (byte i = 0; i < 8; i++) {
+      if (limpar) {
+        displayBits[d][i] = B00000000;
+      }
       lc.setRow(d, i, displayBits[d][i]); 
     }
   }
@@ -369,6 +385,84 @@ void atirar() {
   }
 }
 
+void fimJogo() {
+  
+  displayBits[0][0] = B00000000;
+  barraProgresso = 0;
+  int tempoMover = 200;
+  
+  if (millis() - tempoAnimaFim > tempoMover && animaFimFrame == 0) {
+    exibirMatrizes(true);
+    displayBits[animaFimDisplay][2] = B10000000;
+    displayBits[animaFimDisplay][3] = B10000000;
+    displayBits[animaFimDisplay][4] = B10000000;
+    displayBits[animaFimDisplay][3] = B11000000; 
+    exibirMatrizes();
+    // delay(tempoMover);
+    tempoAnimaFim = millis();
+    animaFimFrame++;
+  }
+  
+  if (millis() - tempoAnimaFim > tempoMover && animaFimFrame == 1) {
+    displayBits[animaFimDisplay][2] = B10000000;
+    displayBits[animaFimDisplay][3] = B00000000;
+    displayBits[animaFimDisplay][4] = B00000000;
+    displayBits[animaFimDisplay][3] = B00000000; 
+
+    displayBits[animaFimDisplay][2] = B01110000;
+    displayBits[animaFimDisplay][3] = B00110000;
+    displayBits[animaFimDisplay][4] = B00010000;
+    exibirMatrizes();
+    // delay(tempoMover);
+    tempoAnimaFim = millis();
+    animaFimFrame++;
+  }
+  
+  if (millis() - tempoAnimaFim > tempoMover && animaFimFrame == 2) {
+    tempoMover = millis();
+    displayBits[animaFimDisplay][2] = B00000000;
+    displayBits[animaFimDisplay][3] = B00000000;
+    displayBits[animaFimDisplay][4] = B00000000;
+
+    displayBits[animaFimDisplay][0] = B00100000;
+    displayBits[animaFimDisplay][1] = B01110000;
+    exibirMatrizes();
+    // delay(tempoMover);
+    tempoAnimaFim = millis();
+    animaFimFrame++;
+  }
+
+  if (millis() - tempoAnimaFim > tempoMover && animaFimFrame == 3) {
+    displayBits[animaFimDisplay][1] = B00000000;
+    displayBits[animaFimDisplay][0] = B01110000;
+    exibirMatrizes();
+    //delay(tempoMover);
+    tempoAnimaFim = millis();
+    animaFimFrame++;
+  }
+
+  if (millis() - tempoAnimaFim > tempoMover && animaFimFrame == 4) {
+    displayBits[animaFimDisplay][0] = B00000000;
+    exibirMatrizes();
+    // delay(tempoMover * 3);
+    tempoAnimaFim = millis();
+    animaFimFrame++;
+    animaFimDisplay--;
+  
+    if (animaFimDisplay == 255) {
+      animaFimDisplay = 3;
+    };
+  }
+  
+  if (millis() - tempoAnimaFim > tempoMover && animaFimFrame == 5) {
+    displayBits[animaFimDisplay][3] = B10000000;
+    exibirMatrizes();
+    // delay(tempoMover);
+    tempoAnimaFim = millis();
+    animaFimFrame = 0;
+  }
+}
+
 void setup() {
 
   Serial.begin(9600);
@@ -379,50 +473,60 @@ void setup() {
   pinMode(BUZZER, OUTPUT);
 
   randomSeed(analogRead(5));
-  // Inicialização do objeto LedControl
 
+  // Inicialização do objeto LedControl
   for (byte i = 0; i < NUM_DISPLAYS; i++) {
     lc.shutdown(i, false);       // Desativa o modo de economia de energia
-    lc.setIntensity(i, 8);       // Define a intensidade do brilho (0-15)
+    lc.setIntensity(i, 2);       // Define a intensidade do brilho (0-15)
     lc.clearDisplay(i);           // Limpa o display
   }
-
-  // lc.setLed(display, linha, coluna, true);
-  // adicionarInimigo(true);
-  exibirNave();
-  exibirMatrizes();
 
 }
 
 void loop() {
-  int xValue = analogRead(X_AXIS);
-  int YValue = analogRead(Y_AXIS);
 
-  if (xValue < 200) {
-    esquerda();
-  }
+  if (start) {
+    int xValue = analogRead(X_AXIS);
+    int YValue = analogRead(Y_AXIS);
 
-  if (xValue > 800) {
-    direita();
-  }
+    if (xValue < 200) {
+      esquerda();
+    }
 
-  if (digitalRead(KEY_B) == 0) {
-    atirar();
-  }
+    if (xValue > 800) {
+      direita();
+    }
 
-  if (digitalRead(KEY_A) == 0) {
-    adicionarInimigo(true);
-  }
+    if (digitalRead(KEY_B) == 0) {
+      atirar();
+    }
 
-  if (digitalRead(KEY_C) == 0 || true) { 
-    exibirMatrizes();
-    adicionarInimigo();
-    atualizarInimigos();
-    atualizarTiros();
-    verificarAcerto();
-    exibirNave();
-    while(digitalRead(KEY_C) == 0);
+    if (digitalRead(KEY_D) == 0) {
+      pause = !pause;
+      while(digitalRead(KEY_D) == 0);
+    }
+    
+    if(!pause && !fim) {
+      adicionarInimigo();
+      atualizarInimigos();
+      atualizarTiros();
+      verificarAcerto();
+      exibirNave();
+    }
+
+    if (fim) {
+      fimJogo();
+    }
+
+  } else {
+    if (digitalRead(KEY_C) == 0) { 
+      start = true;
+      exibirMatrizes(true);
+      while(digitalRead(KEY_C) == 0);
+    }
   }
+  
+  exibirMatrizes();
 }
 
 
