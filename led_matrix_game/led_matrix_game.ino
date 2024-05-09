@@ -1,25 +1,30 @@
-/*
-  Adicionar elementos que precisam ser destruídos com X tiros, se possível diminuindo o brilho até desaparecer
+/**
+ * LED Matrix Game
+ * Developed by: Ricardo Teixeira
+ * Repository: https://github.com/ricardoteix/led_matrix_game
+ * 
+ * All rights reserved. 
+ * 
 */
 
+// https://wayoda.github.io/LedControl/
 #include <LedControl.h>
 
+// Shield Joystick
 #define X_AXIS A0
 #define Y_AXIS A1
 #define KEY_A 2
 #define KEY_B 3
 #define KEY_C 4
 #define KEY_D 5
+
 #define BUZZER 7
 
-
 // Definição dos pinos para conexão com o MAX7219
-#define DATA_IN_PIN   9  // Pino de dados (DIN)
+#define DATA_IN_PIN   9   // Pino de dados (DIN)
 #define CLK_PIN       10  // Pino do clock (CLK)
 #define LOAD_PIN      11  // Pino de carga (CS)
-
-// Número de matrizes de LED no display
-#define NUM_DISPLAYS  4  
+#define NUM_DISPLAYS  4   // Número de matrizes de LED no display
 
 LedControl lc = LedControl(DATA_IN_PIN, CLK_PIN, LOAD_PIN, NUM_DISPLAYS);
 
@@ -79,6 +84,7 @@ unsigned long tempoTiro = millis();
 unsigned long tempoAtualizarTiro = millis();
 unsigned long tempoNascerInimigo = millis();
 unsigned long tempoMoverInimigo = millis();
+
 int tempoMoverInimigoEspera = 200;
 int tempoNascerInimigoEspera = 2000;
 
@@ -89,6 +95,7 @@ struct Tiro {
   byte y = 255;
 };
 
+// Definição do inimigo para representar um objeto com x, y e display
 struct Inimigo {
   byte display = 255;
   byte x = 255;
@@ -99,9 +106,6 @@ struct Inimigo {
 byte barraProgresso = B00000000;
 byte contagemAcertos = 0;
 
-int quantidadeInimigosLevel = 5;
-
-// Lista para armazenar os objetos LEDPosition
 Tiro tiros[8]; // Máximo de 8 tipos simultâneos, 1 por coluna
 Inimigo inimigos[3]; // Máximo de 3 inimigos simultâneos em tela
 byte ultimoInimigo = 0;
@@ -167,14 +171,9 @@ void verificarProgresso() {
   if (barraProgresso == B11111111) {
     fim = true;
   }
-
-  // if (contagemAcertos >= quantidadeInimigosLevel) {
-  //   barraProgresso = (1 << (contagemAcertos / quantidadeInimigosLevel)) - 1;
-  //   tempoNascerInimigoEspera -= 200;
-  //   tempoMoverInimigoEspera -= 20;
-  // }
   
 }
+
 void verificarAcerto() {
   
   for (int i = 0; i < 8; i++) {
@@ -301,7 +300,6 @@ void atualizarInimigos() {
         inimigos[i].display = 255;
         inimigos[i].x = 255;
         inimigos[i].y = 255;
-        Serial.println("Colisao!");
 
         tone(BUZZER, 500, 200);
       }
@@ -466,6 +464,7 @@ void fimJogo() {
 void setup() {
 
   Serial.begin(9600);
+
   pinMode(KEY_A, INPUT);
   pinMode(KEY_B, INPUT);
   pinMode(KEY_C, INPUT);
@@ -476,9 +475,9 @@ void setup() {
 
   // Inicialização do objeto LedControl
   for (byte i = 0; i < NUM_DISPLAYS; i++) {
-    lc.shutdown(i, false);       // Desativa o modo de economia de energia
-    lc.setIntensity(i, 2);       // Define a intensidade do brilho (0-15)
-    lc.clearDisplay(i);           // Limpa o display
+    lc.shutdown(i, false);  // Desativa o modo de economia de energia
+    lc.setIntensity(i, 2);  // Define a intensidade do brilho (0-15)
+    lc.clearDisplay(i);     // Limpa o display
   }
 
 }
